@@ -148,6 +148,13 @@ variable "redis_alternative_location" {
   default = "us-central1-c"
 }
 
+variable "redis_enable_auth" {
+  type    = bool
+  default = false
+
+  description = "Enable Redis authentication. The default is false because not all redis versions support authentication."
+}
+
 variable "service_environment" {
   type    = map(map(string))
   default = {}
@@ -188,12 +195,6 @@ variable "adminapi_hosts" {
   default = []
 
   description = "List of domains upon which the adminapi is served."
-}
-
-variable "enx_onboarding_domain" {
-  type        = string
-  default     = ""
-  description = "Domain on which to serve onboarding redirects."
 }
 
 variable "enx_redirect_domain" {
