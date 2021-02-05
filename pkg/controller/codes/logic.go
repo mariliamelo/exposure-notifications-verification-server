@@ -26,7 +26,7 @@ import (
 	"github.com/google/exposure-notifications-verification-server/pkg/rbac"
 )
 
-func (c *Controller) CheckCodeStatus(r *http.Request, uuid string) (*database.VerificationCode, int, *api.ErrorReturn) {
+func (c *Controller) checkCodeStatus(r *http.Request, uuid string) (*database.VerificationCode, int, *api.ErrorReturn) {
 	ctx := r.Context()
 
 	logger := logging.FromContext(ctx).Named("codes.CheckCodeStatus")
@@ -49,12 +49,6 @@ func (c *Controller) CheckCodeStatus(r *http.Request, uuid string) (*database.Ve
 	}
 
 	logger.Debugw("Found code", "verificationCode", code)
-
-	if code.UUID == "" { // if no row is found, code will not be populated
-		logger.Errorw("failed to check otp code status", "error", "code not found")
-		return nil, http.StatusNotFound,
-			api.Errorf("code does not exist or is expired and removed").WithCode(api.ErrVerifyCodeNotFound)
-	}
 
 	// The current user must have issued the code or be a realm admin.
 	if membership != nil && !membership.Can(rbac.CodeRead) {

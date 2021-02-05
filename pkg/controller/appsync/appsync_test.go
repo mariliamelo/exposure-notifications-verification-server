@@ -1,4 +1,4 @@
-// Copyright 2020 Google LLC
+// Copyright 2021 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,9 +17,6 @@ package appsync
 import (
 	"testing"
 
-	"github.com/google/exposure-notifications-verification-server/internal/clients"
-	"github.com/google/exposure-notifications-verification-server/internal/project"
-	"github.com/google/exposure-notifications-verification-server/pkg/config"
 	"github.com/google/exposure-notifications-verification-server/pkg/database"
 )
 
@@ -29,71 +26,4 @@ func TestMain(m *testing.M) {
 	testDatabaseInstance = database.MustTestInstance()
 	defer testDatabaseInstance.MustClose()
 	m.Run()
-}
-
-func TestAppSync(t *testing.T) {
-	t.Parallel()
-
-	ctx := project.TestContext(t)
-
-	db, _ := testDatabaseInstance.NewDatabase(t, nil)
-	config := &config.AppSyncConfig{}
-	c, _ := New(config, db, nil)
-
-	t.Run("name", func(t *testing.T) {
-		t.Parallel()
-
-		realm := database.NewRealmWithDefaults("test")
-		realm.RegionCode = "US-WA"
-		if err := db.SaveRealm(realm, database.SystemTest); err != nil {
-			t.Fatalf("error saving realm: %v", err)
-		}
-
-		m := &database.MobileApp{
-			Name:    "US-WA Android App",
-			RealmID: realm.ID,
-			OS:      database.OSTypeAndroid,
-			AppID:   "testAppId",
-			SHA:     "AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA",
-		}
-		if err := db.SaveMobileApp(m, database.SystemTest); err != nil {
-			t.Fatalf("error saving realm: %v", err)
-		}
-
-		resp := &clients.AppsResponse{
-			Apps: []clients.App{
-				{
-					Region: "US-WA",
-					IsEnx:  true,
-					AndroidTarget: clients.AndroidTarget{
-						Namespace:              "android_app",
-						PackageName:            "testAppID-butDifferent",
-						SHA256CertFingerprints: "AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA",
-					},
-				}, {
-					Region: "US-WA",
-					IsEnx:  true,
-					AndroidTarget: clients.AndroidTarget{
-						Namespace:              "android_app",
-						PackageName:            "testAppId2",
-						SHA256CertFingerprints: "BB:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA",
-					},
-				},
-			},
-		}
-
-		merr := c.syncApps(ctx, resp)
-		if e := merr.ErrorOrNil(); e != nil {
-			t.Fatalf(e.Error())
-		}
-
-		apps, err := db.ListActiveApps(realm.ID)
-		if err != nil {
-			t.Fatal("failed to list apps", err)
-		}
-
-		if got, want := len(apps), 2; got != want {
-			t.Errorf("got %d apps, expected %d", got, want)
-		}
-	})
 }

@@ -15,8 +15,13 @@
 package login_test
 
 import (
+	"context"
 	"testing"
+	"time"
 
+	"github.com/chromedp/chromedp"
+	"github.com/google/exposure-notifications-verification-server/internal/browser"
+	"github.com/google/exposure-notifications-verification-server/internal/envstest"
 	"github.com/google/exposure-notifications-verification-server/pkg/database"
 )
 
@@ -26,4 +31,21 @@ func TestMain(m *testing.M) {
 	testDatabaseInstance = database.MustTestInstance()
 	defer testDatabaseInstance.MustClose()
 	m.Run()
+}
+
+func TestHandleLogin_ShowLogin(t *testing.T) {
+	t.Parallel()
+
+	harness := envstest.NewServer(t, testDatabaseInstance)
+
+	browserCtx := browser.New(t)
+	taskCtx, done := context.WithTimeout(browserCtx, 30*time.Second)
+	defer done()
+
+	if err := chromedp.Run(taskCtx,
+		chromedp.Navigate(`http://`+harness.Server.Addr()),
+		chromedp.WaitVisible(`body#login`, chromedp.ByQuery),
+	); err != nil {
+		t.Fatal(err)
+	}
 }

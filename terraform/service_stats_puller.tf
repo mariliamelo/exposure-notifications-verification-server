@@ -127,12 +127,17 @@ resource "google_cloud_run_service" "stats-puller" {
 
   lifecycle {
     ignore_changes = [
+      metadata[0].annotations["client.knative.dev/user-image"],
+      metadata[0].annotations["run.googleapis.com/client-name"],
+      metadata[0].annotations["run.googleapis.com/client-version"],
+      metadata[0].annotations["run.googleapis.com/ingress-status"],
+      metadata[0].annotations["run.googleapis.com/sandbox"],
+      metadata[0].labels["cloud.googleapis.com/location"],
       template[0].metadata[0].annotations["client.knative.dev/user-image"],
       template[0].metadata[0].annotations["run.googleapis.com/client-name"],
       template[0].metadata[0].annotations["run.googleapis.com/client-version"],
+      template[0].metadata[0].annotations["run.googleapis.com/sandbox"],
       template[0].spec[0].containers[0].image,
-      metadata[0].annotations["run.googleapis.com/ingress-status"],
-      metadata[0].labels["cloud.googleapis.com/location"],
     ]
   }
 }
@@ -162,7 +167,7 @@ resource "google_cloud_run_service_iam_member" "stats-puller-invoker" {
 resource "google_cloud_scheduler_job" "stats-puller-worker" {
   name             = "stats-puller-worker"
   region           = var.cloudscheduler_location
-  schedule         = "30 * * * *"
+  schedule         = "4,34 * * * *"
   time_zone        = "America/Los_Angeles"
   attempt_deadline = "600s"
 
