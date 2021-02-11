@@ -37,7 +37,7 @@ fi
 
 
 echo "📚 Fetch dependencies"
-OUT="$(go get -t -tags=performance,e2e ./... 2>&1)" || {
+OUT="$(go get -t ./... 2>&1)" || {
   echo "✋ Error fetching dependencies"
   echo "\n\n${OUT}\n\n"
   exit 1
@@ -45,67 +45,15 @@ OUT="$(go get -t -tags=performance,e2e ./... 2>&1)" || {
 
 
 echo "📚 Fetch test dependencies"
-OUT="$(go test -i -tags=performance,e2e ./... 2>&1)" || {
+OUT="$(go test -i ./... 2>&1)" || {
   echo "✋ Error fetching test dependencies"
   echo "\n\n${OUT}\n\n"
   exit 1
 }
 
 
-echo "🧹 Verify formatting"
-make fmtcheck || {
-  echo "✋ Found formatting errors."
-  exit 1
-}
-
-
-echo "🐝 Lint"
-make staticcheck || {
-  echo "✋ Found linter errors."
-  exit 1
-}
-
-
-echo "🦶 Verify bodyclose"
-make bodyclose || {
-  echo "✋ Found unclosed response bodies."
-  exit 1
-}
-
-
-echo "🐝 Verify spelling"
-make spellcheck || {
-  echo "✋ Found spelling errors."
-  exit 1
-}
-
-
-echo "↹ Verify tabs"
-make tabcheck || {
-  echo "✋ Found tabs in html."
-  exit 1
-}
-
-
-echo "🌌 Verify and tidy module"
-OUT="$(go mod verify 2>&1 && go mod tidy 2>&1)" || {
-  echo "✋ Error validating module"
-  echo "\n\n${OUT}\n\n"
-  exit 1
-}
-OUT="$(git diff go.mod)"
-if [ -n "${OUT}" ]; then
-  echo "✋ go.mod is out of sync - run 'go mod tidy'."
-  exit 1
-fi
-OUT="$(git diff go.sum)"
-if [ -n "${OUT}" ]; then
-  echo "✋ go.sum is out of sync - run 'go mod tidy'."
-  exit 1
-fi
-
-
 echo "🧪 Test"
 make test-acc
+
 echo "🔬 Test Coverage"
 make test-coverage

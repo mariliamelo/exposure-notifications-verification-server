@@ -17,7 +17,7 @@ package certapi
 import (
 	"github.com/google/exposure-notifications-verification-server/pkg/observability"
 
-	enobservability "github.com/google/exposure-notifications-server/pkg/observability"
+	enobs "github.com/google/exposure-notifications-server/pkg/observability"
 
 	"go.opencensus.io/plugin/ochttp"
 	"go.opencensus.io/stats"
@@ -26,12 +26,10 @@ import (
 
 const metricPrefix = observability.MetricRoot + "/api/certificate"
 
-var (
-	mLatencyMs = stats.Float64(metricPrefix+"/request", "# of certificate issue requests", stats.UnitMilliseconds)
-)
+var mLatencyMs = stats.Float64(metricPrefix+"/request", "# of certificate issue requests", stats.UnitMilliseconds)
 
 func init() {
-	enobservability.CollectViews([]*view.View{
+	enobs.CollectViews([]*view.View{
 		{
 			Name:        metricPrefix + "/request_count",
 			Measure:     mLatencyMs,

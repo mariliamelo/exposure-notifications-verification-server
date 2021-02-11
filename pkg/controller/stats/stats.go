@@ -32,24 +32,24 @@ import (
 // notFilenameRe is a regular expression that matches non-filename characters.
 var notFilenameRe = regexp.MustCompile(`[^A-Za-z0-9]+`)
 
-// StatsType represents a type of stat.
-type StatsType int64
+// Type represents a type of stat.
+type Type int64
 
 const (
-	_ StatsType = iota
-	StatsTypeCSV
-	StatsTypeJSON
+	_ Type = iota
+	TypeCSV
+	TypeJSON
 )
 
 // Controller is a stats controller.
 type Controller struct {
 	cacher cache.Cacher
 	db     *database.Database
-	h      render.Renderer
+	h      *render.Renderer
 }
 
 // New creates a new stats controller.
-func New(cacher cache.Cacher, db *database.Database, h render.Renderer) *Controller {
+func New(cacher cache.Cacher, db *database.Database, h *render.Renderer) *Controller {
 	return &Controller{
 		cacher: cacher,
 		db:     db,

@@ -18,47 +18,21 @@ HTML_FILES = $(shell find . -name \*.html)
 GO_FILES = $(shell find . -name \*.go)
 MD_FILES = $(shell find . -name \*.md)
 
-fmtcheck:
-	@command -v goimports > /dev/null 2>&1 || go get golang.org/x/tools/cmd/goimports
-	@CHANGES="$$(goimports -d $(GOFMT_FILES))"; \
-		if [ -n "$${CHANGES}" ]; then \
-			echo "Unformatted (run goimports -w .):\n\n$${CHANGES}\n\n"; \
-			exit 1; \
-		fi
-	@# Annoyingly, goimports does not support the simplify flag.
-	@CHANGES="$$(gofmt -s -d $(GOFMT_FILES))"; \
-		if [ -n "$${CHANGES}" ]; then \
-			echo "Unformatted (run gofmt -s -w .):\n\n$${CHANGES}\n\n"; \
-			exit 1; \
-		fi
-.PHONY: fmtcheck
+# lint uses the same linter as CI and tries to report the same results running
+# locally. There is a chance that CI detects linter errors that are not found
+# locally, but it should be rare.
+lint:
+	@command -v golangci-lint > /dev/null 2>&1 || GO111MODULE=off go get github.com/golangci/golangci-lint/cmd/golangci-lint@v1.36.0
+	golangci-lint run --config .golangci.yaml
+.PHONY: lint
 
 tabcheck:
-	@CHANGES="$$(awk '/\t/ {print FILENAME,FNR}' $(HTML_FILES))"; \
-		if [ -n "$${CHANGES}" ]; then \
-			echo "$${CHANGES}\n\n"; \
+	@FINDINGS="$$(awk '/\t/ {printf "%s:%s:found tab character",FILENAME,FNR}' $(HTML_FILES))"; \
+		if [ -n "$${FINDINGS}" ]; then \
+			echo "$${FINDINGS}\n\n"; \
 			exit 1; \
 		fi
 .PHONY: tabcheck
-
-bodyclose:
-	@command -v bodyclose > /dev/null 2>&1 || go get github.com/timakin/bodyclose
-	@go vet -vettool=$$(which bodyclose) ./...
-.PHONY: bodyclose
-
-spellcheck:
-	@command -v misspell > /dev/null 2>&1 || go get github.com/client9/misspell/cmd/misspell
-	@misspell -locale="US" -error -source="text" $(GO_FILES) $(HTML_FILES) $(MD_FILES)
-.PHONY: spellcheck
-
-staticcheck:
-	@command -v staticcheck > /dev/null 2>&1 || go get honnef.co/go/tools/cmd/staticcheck
-	@staticcheck -checks="all,-S1023" -tests $(GOFMT_FILES)
-.PHONY: staticcheck
-
-zapcheck:
-	@command -v zapw > /dev/null 2>&1 || GO111MODULE=off go get github.com/sethvargo/zapw/cmd/zapw
-	@zapw ./...
 
 test:
 	@go test \
@@ -82,3 +56,7 @@ test-acc:
 test-coverage:
 	@go tool cover -func ./coverage.out | grep total
 .PHONY: test-coverage
+
+zapcheck:
+	@command -v zapw > /dev/null 2>&1 || GO111MODULE=off go get github.com/sethvargo/zapw/cmd/zapw
+	@zapw ./...

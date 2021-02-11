@@ -15,7 +15,7 @@
 package verifyapi
 
 import (
-	enobservability "github.com/google/exposure-notifications-server/pkg/observability"
+	enobs "github.com/google/exposure-notifications-server/pkg/observability"
 	"github.com/google/exposure-notifications-verification-server/pkg/observability"
 
 	"go.opencensus.io/plugin/ochttp"
@@ -25,12 +25,10 @@ import (
 
 const metricPrefix = observability.MetricRoot + "/api/verify"
 
-var (
-	mLatencyMs = stats.Float64(metricPrefix+"/request", "verify requests latency", stats.UnitMilliseconds)
-)
+var mLatencyMs = stats.Float64(metricPrefix+"/request", "verify requests latency", stats.UnitMilliseconds)
 
 func init() {
-	enobservability.CollectViews([]*view.View{
+	enobs.CollectViews([]*view.View{
 		{
 			Name:        metricPrefix + "/request_count",
 			Measure:     mLatencyMs,

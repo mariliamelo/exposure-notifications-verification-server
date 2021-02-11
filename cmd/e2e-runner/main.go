@@ -26,9 +26,9 @@ import (
 	"github.com/google/exposure-notifications-server/pkg/observability"
 	"github.com/google/exposure-notifications-server/pkg/server"
 
+	"github.com/google/exposure-notifications-verification-server/internal/buildinfo"
 	"github.com/google/exposure-notifications-verification-server/internal/clients"
 	"github.com/google/exposure-notifications-verification-server/internal/envstest"
-	"github.com/google/exposure-notifications-verification-server/pkg/buildinfo"
 	"github.com/google/exposure-notifications-verification-server/pkg/config"
 	"github.com/google/exposure-notifications-verification-server/pkg/controller/middleware"
 	"github.com/google/exposure-notifications-verification-server/pkg/render"
@@ -116,7 +116,7 @@ func realMain(ctx context.Context) error {
 		enxRedirectClient, err = clients.NewENXRedirectClient(u,
 			clients.WithTimeout(30*time.Second))
 		if err != nil {
-			return fmt.Errorf("failed to create enx-redirect client: %s", err)
+			return fmt.Errorf("failed to create enx-redirect client: %w", err)
 		}
 	}
 
@@ -156,21 +156,21 @@ func realMain(ctx context.Context) error {
 }
 
 // handleDefault handles the default end-to-end scenario.
-func handleDefault(cfg *config.E2ERunnerConfig, h render.Renderer) http.Handler {
+func handleDefault(cfg *config.E2ERunnerConfig, h *render.Renderer) http.Handler {
 	c := *cfg
 	c.DoRevise = false
 	return handleEndToEnd(&c, h)
 }
 
 // handleRevise runs the end-to-end runner with revision tokens.
-func handleRevise(cfg *config.E2ERunnerConfig, h render.Renderer) http.Handler {
+func handleRevise(cfg *config.E2ERunnerConfig, h *render.Renderer) http.Handler {
 	c := *cfg
 	c.DoRevise = true
 	return handleEndToEnd(&c, h)
 }
 
 // handleEndToEnd handles the common end-to-end scenario.
-func handleEndToEnd(cfg *config.E2ERunnerConfig, h render.Renderer) http.Handler {
+func handleEndToEnd(cfg *config.E2ERunnerConfig, h *render.Renderer) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 
@@ -184,7 +184,7 @@ func handleEndToEnd(cfg *config.E2ERunnerConfig, h render.Renderer) http.Handler
 }
 
 // handleENXRedirect handles tests for the redirector service.
-func handleENXRedirect(client *clients.ENXRedirectClient, h render.Renderer) http.Handler {
+func handleENXRedirect(client *clients.ENXRedirectClient, h *render.Renderer) http.Handler {
 	// If the client doesn't exist, it means the host was not provided.
 	if client == nil {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -204,11 +204,11 @@ func handleENXRedirect(client *clients.ENXRedirectClient, h render.Renderer) htt
 	})
 }
 
-func renderOK(w http.ResponseWriter, h render.Renderer) {
+func renderOK(w http.ResponseWriter, h *render.Renderer) {
 	h.RenderJSON(w, http.StatusOK, map[string]interface{}{"success": true})
 }
 
-func renderJSONError(w http.ResponseWriter, r *http.Request, h render.Renderer, err error) {
+func renderJSONError(w http.ResponseWriter, r *http.Request, h *render.Renderer, err error) {
 	logger := logging.FromContext(r.Context())
 	logger.Errorw("failure", "error", err)
 	h.RenderJSON(w, http.StatusInternalServerError, err)

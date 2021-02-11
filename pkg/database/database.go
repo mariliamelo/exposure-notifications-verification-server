@@ -33,8 +33,9 @@ import (
 	"github.com/google/exposure-notifications-server/pkg/base64util"
 	"github.com/google/exposure-notifications-server/pkg/keys"
 	"github.com/google/exposure-notifications-server/pkg/logging"
-	enobservability "github.com/google/exposure-notifications-server/pkg/observability"
+	enobs "github.com/google/exposure-notifications-server/pkg/observability"
 	"github.com/google/exposure-notifications-server/pkg/secrets"
+	"github.com/google/exposure-notifications-verification-server/internal/buildinfo"
 	"github.com/google/exposure-notifications-verification-server/pkg/cache"
 	"github.com/google/exposure-notifications-verification-server/pkg/observability"
 	"github.com/jinzhu/gorm"
@@ -47,11 +48,9 @@ import (
 	postgres "github.com/lib/pq"
 )
 
-var (
-	// callbackLock prevents multiple callbacks from being registered
-	// simultaneously because that's a data race in gorm.
-	callbackLock sync.Mutex
-)
+// callbackLock prevents multiple callbacks from being registered
+// simultaneously because that's a data race in gorm.
+var callbackLock sync.Mutex
 
 // Database is a handle to the database layer for the Exposure Notifications
 // Verification Server.
@@ -80,11 +79,11 @@ type Database struct {
 // Overrides the postgresql driver with
 func init() {
 	for _, v := range sql.Drivers() {
-		if v == enobservability.OCSQLDriverName {
+		if v == enobs.OCSQLDriverName {
 			return
 		}
 	}
-	sql.Register(enobservability.OCSQLDriverName, ocsql.Wrap(&postgres.Driver{}))
+	sql.Register(enobs.OCSQLDriverName, ocsql.Wrap(&postgres.Driver{}))
 }
 
 // SupportsPerRealmSigning returns true if the configuration supports
@@ -344,7 +343,7 @@ func callbackIncrementMetric(m *stats.Int64Measure, table string) func(scope *go
 			ctx = observability.WithRealmID(ctx, realmID)
 		}
 
-		ctx = observability.WithBuildInfo(ctx)
+		ctx = enobs.WithBuildInfo(ctx, buildinfo.VerificationServer)
 		stats.Record(ctx, m.M(1))
 	}
 }
@@ -621,41 +620,41 @@ func stringPtr(s string) *string {
 }
 
 // stringDiff builds a diff of the string values.
-func stringDiff(old, new string) string {
+func stringDiff(then, now string) string {
 	var w strings.Builder
 
-	for _, line := range strings.Split(old, "\n") {
+	for _, line := range strings.Split(then, "\n") {
 		fmt.Fprintf(&w, "-%s\n", line)
 	}
 
-	for _, line := range strings.Split(new, "\n") {
+	for _, line := range strings.Split(now, "\n") {
 		fmt.Fprintf(&w, "+%s\n", line)
 	}
 
 	return w.String()
 }
 
-func stringSliceDiff(old, new []string) string {
-	oldMap := make(map[string]struct{}, len(old))
-	for _, k := range old {
-		oldMap[k] = struct{}{}
+func stringSliceDiff(then, now []string) string {
+	thenMap := make(map[string]struct{}, len(then))
+	for _, k := range then {
+		thenMap[k] = struct{}{}
 	}
-	newMap := make(map[string]struct{}, len(new))
-	for _, k := range new {
-		newMap[k] = struct{}{}
+	nowMap := make(map[string]struct{}, len(now))
+	for _, k := range now {
+		nowMap[k] = struct{}{}
 	}
 
-	added := make([]string, 0, len(new))
-	for k := range newMap {
-		if _, ok := oldMap[k]; !ok {
+	added := make([]string, 0, len(now))
+	for k := range nowMap {
+		if _, ok := thenMap[k]; !ok {
 			added = append(added, k)
 		}
 	}
 	sort.Strings(added)
 
-	removed := make([]string, 0, len(old))
-	for k := range oldMap {
-		if _, ok := newMap[k]; !ok {
+	removed := make([]string, 0, len(then))
+	for k := range thenMap {
+		if _, ok := nowMap[k]; !ok {
 			removed = append(removed, k)
 		}
 	}
@@ -671,16 +670,16 @@ func stringSliceDiff(old, new []string) string {
 	return w.String()
 }
 
-func boolDiff(old, new bool) string {
-	return stringDiff(strconv.FormatBool(old), strconv.FormatBool(new))
+func boolDiff(then, now bool) string {
+	return stringDiff(strconv.FormatBool(then), strconv.FormatBool(now))
 }
 
-func float32Diff(old, new float32) string {
-	return float64Diff(float64(old), float64(new))
+func float32Diff(then, now float32) string {
+	return float64Diff(float64(then), float64(now))
 }
 
-func float64Diff(old, new float64) string {
-	return stringDiff(strconv.FormatFloat(old, 'f', 4, 64), strconv.FormatFloat(new, 'f', 4, 64))
+func float64Diff(then, now float64) string {
+	return stringDiff(strconv.FormatFloat(then, 'f', 4, 64), strconv.FormatFloat(now, 'f', 4, 64))
 }
 
 // uintValue gets the value of the uint pointer, returning 0 for nil.
@@ -699,6 +698,6 @@ func uintPtr(v uint) *uint {
 	return &v
 }
 
-func uintDiff(old, new uint) string {
-	return stringDiff(strconv.FormatUint(uint64(old), 10), strconv.FormatUint(uint64(new), 10))
+func uintDiff(then, now uint) string {
+	return stringDiff(strconv.FormatUint(uint64(then), 10), strconv.FormatUint(uint64(now), 10))
 }

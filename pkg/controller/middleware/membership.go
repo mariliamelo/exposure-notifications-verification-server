@@ -35,7 +35,7 @@ import (
 // RequireMembership to enforce membership.
 //
 // This must come after RequireAuth so that the user is loaded onto the context.
-func LoadCurrentMembership(h render.Renderer) mux.MiddlewareFunc {
+func LoadCurrentMembership(h *render.Renderer) mux.MiddlewareFunc {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			ctx := r.Context()
@@ -95,7 +95,7 @@ func LoadCurrentMembership(h render.Renderer) mux.MiddlewareFunc {
 //
 // This must come after LoadCurrentMembership so the membership is on the
 // context
-func RequireMembership(h render.Renderer) mux.MiddlewareFunc {
+func RequireMembership(h *render.Renderer) mux.MiddlewareFunc {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			ctx := r.Context()
@@ -130,7 +130,7 @@ func passwordRedirectRequired(ctx context.Context, user *database.User, realm *d
 	session := controller.SessionFromContext(ctx)
 	flash := controller.Flash(session)
 
-	if err == errPasswordChangeRequired {
+	if errors.Is(err, errPasswordChangeRequired) {
 		flash.Error(strings.Title(err.Error() + "."))
 		return true
 	}

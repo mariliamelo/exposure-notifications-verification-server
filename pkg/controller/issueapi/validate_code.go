@@ -16,17 +16,18 @@ package issueapi
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
 	"time"
 
 	"github.com/google/exposure-notifications-server/pkg/logging"
+	enobs "github.com/google/exposure-notifications-server/pkg/observability"
 	"github.com/google/exposure-notifications-verification-server/internal/project"
 	"github.com/google/exposure-notifications-verification-server/pkg/api"
 	"github.com/google/exposure-notifications-verification-server/pkg/controller"
 	"github.com/google/exposure-notifications-verification-server/pkg/database"
-	"github.com/google/exposure-notifications-verification-server/pkg/observability"
 	"github.com/google/exposure-notifications-verification-server/pkg/sms"
 )
 
@@ -52,7 +53,7 @@ func (c *Controller) BuildVerificationCode(ctx context.Context, request *api.Iss
 	// If this realm requires a date but no date was specified, return an error.
 	if realm.RequireDate && request.SymptomDate == "" && request.TestDate == "" {
 		return nil, &IssueResult{
-			obsResult:   observability.ResultError("MISSING_REQUIRED_FIELDS"),
+			obsResult:   enobs.ResultError("MISSING_REQUIRED_FIELDS"),
 			HTTPCode:    http.StatusBadRequest,
 			ErrorReturn: api.Errorf("missing either test or symptom date").WithCode(api.ErrMissingDate),
 		}
@@ -77,7 +78,7 @@ func (c *Controller) BuildVerificationCode(ctx context.Context, request *api.Iss
 		if err != nil {
 			logger.Errorw("failed to get sms provider", "error", err)
 			return nil, &IssueResult{
-				obsResult:   observability.ResultError("FAILED_TO_GET_SMS_PROVIDER"),
+				obsResult:   enobs.ResultError("FAILED_TO_GET_SMS_PROVIDER"),
 				HTTPCode:    http.StatusInternalServerError,
 				ErrorReturn: api.Errorf("failed to get sms provider").WithCode(api.ErrInternal),
 			}
@@ -85,7 +86,7 @@ func (c *Controller) BuildVerificationCode(ctx context.Context, request *api.Iss
 		if smsProvider == nil {
 			err := fmt.Errorf("phone provided, but no sms provider is configured")
 			return nil, &IssueResult{
-				obsResult:   observability.ResultError("FAILED_TO_GET_SMS_PROVIDER"),
+				obsResult:   enobs.ResultError("FAILED_TO_GET_SMS_PROVIDER"),
 				HTTPCode:    http.StatusBadRequest,
 				ErrorReturn: api.Error(err),
 			}
@@ -104,14 +105,14 @@ func (c *Controller) BuildVerificationCode(ctx context.Context, request *api.Iss
 		if code, err := realm.FindVerificationCodeByUUID(c.db, vCode.UUID); err != nil {
 			if !database.IsNotFound(err) {
 				return nil, &IssueResult{
-					obsResult:   observability.ResultError("FAILED_TO_CHECK_UUID"),
+					obsResult:   enobs.ResultError("FAILED_TO_CHECK_UUID"),
 					HTTPCode:    http.StatusInternalServerError,
 					ErrorReturn: api.Error(err).WithCode(api.ErrInternal),
 				}
 			}
 		} else if code != nil {
 			return nil, &IssueResult{
-				obsResult:   observability.ResultError("UUID_CONFLICT"),
+				obsResult:   enobs.ResultError("UUID_CONFLICT"),
 				HTTPCode:    http.StatusConflict,
 				ErrorReturn: api.Errorf("code for %s already exists", vCode.UUID).WithCode(api.ErrUUIDAlreadyExists),
 			}
@@ -121,16 +122,16 @@ func (c *Controller) BuildVerificationCode(ctx context.Context, request *api.Iss
 	vCode.Code = "placeholder"
 	vCode.LongCode = "placeholder"
 	if err := vCode.Validate(realm); err != nil {
-		switch err {
-		case database.ErrInvalidTestType:
+		switch {
+		case errors.Is(err, database.ErrInvalidTestType):
 			return nil, &IssueResult{
-				obsResult:   observability.ResultError("INVALID_TEST_TYPE"),
+				obsResult:   enobs.ResultError("INVALID_TEST_TYPE"),
 				HTTPCode:    http.StatusBadRequest,
 				ErrorReturn: api.Errorf("invalid test type").WithCode(api.ErrInvalidTestType),
 			}
-		case database.ErrUnsupportedTestType:
+		case errors.Is(err, database.ErrUnsupportedTestType):
 			return nil, &IssueResult{
-				obsResult:   observability.ResultError("UNSUPPORTED_TEST_TYPE"),
+				obsResult:   enobs.ResultError("UNSUPPORTED_TEST_TYPE"),
 				HTTPCode:    http.StatusBadRequest,
 				ErrorReturn: api.Errorf("unsupported test type: %v", request.TestType).WithCode(api.ErrUnsupportedTestType),
 			}
@@ -138,7 +139,7 @@ func (c *Controller) BuildVerificationCode(ctx context.Context, request *api.Iss
 
 		logger.Warnw("unhandled db validation", "error", err)
 		return nil, &IssueResult{
-			obsResult:   observability.ResultError("DB_VALIDATION_REJECTED"),
+			obsResult:   enobs.ResultError("DB_VALIDATION_REJECTED"),
 			HTTPCode:    http.StatusInternalServerError,
 			ErrorReturn: api.Error(err).WithCode(api.ErrInternal),
 		}
