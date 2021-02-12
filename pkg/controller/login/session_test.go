@@ -12,55 +12,54 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package user_test
+package login_test
 
 import (
-	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 
 	"github.com/google/exposure-notifications-verification-server/internal/envstest"
 	"github.com/google/exposure-notifications-verification-server/internal/project"
 	"github.com/google/exposure-notifications-verification-server/pkg/controller"
-	"github.com/google/exposure-notifications-verification-server/pkg/controller/user"
-	"github.com/google/exposure-notifications-verification-server/pkg/database"
-	"github.com/google/exposure-notifications-verification-server/pkg/rbac"
+	"github.com/google/exposure-notifications-verification-server/pkg/controller/login"
 	"github.com/google/exposure-notifications-verification-server/pkg/render"
-	"github.com/gorilla/mux"
 )
 
-func TestHandleResetPassword(t *testing.T) {
+func TestHandleSession_HandleSubmit(t *testing.T) {
 	t.Parallel()
 
 	ctx := project.TestContext(t)
 	harness := envstest.NewServer(t, testDatabaseInstance)
 
-	realm, testUser, session, err := harness.ProvisionAndLogin()
+	_, _, session, err := harness.ProvisionAndLogin()
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	ctx = controller.WithSession(ctx, session)
 
 	h, err := render.New(ctx, envstest.ServerAssetsPath(), true)
 	if err != nil {
 		t.Fatalf("failed to create renderer: %v", err)
 	}
-	c := user.New(harness.AuthProvider, harness.Cacher, harness.Database, h)
-	router := mux.NewRouter()
-	router.Handle("/{id:[0-9]+}/reset-password", c.HandleResetPassword()).Methods("POST")
+	c := login.New(harness.AuthProvider, harness.Cacher, harness.Config, harness.Database, h)
+	handler := c.HandleCreateSession()
 
-	// Needs membership
+	envstest.ExerciseSessionMissing(t, handler)
+
+	// session requires form token
 	func() {
-		req, err := http.NewRequestWithContext(ctx, http.MethodPost, fmt.Sprintf("/%d/reset-password", testUser.ID), strings.NewReader(""))
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, "", strings.NewReader(""))
 		if err != nil {
 			t.Fatal(err)
 		}
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 
 		w := httptest.NewRecorder()
-		router.ServeHTTP(w, req)
+		handler.ServeHTTP(w, req)
 		result := w.Result()
 		defer result.Body.Close()
 
@@ -69,50 +68,23 @@ func TestHandleResetPassword(t *testing.T) {
 		}
 	}()
 
-	// Needs userwrite
+	// session info missing (because localauth requires extra info in the cookie)
 	func() {
-		ctx = controller.WithMembership(ctx, &database.Membership{
-			Realm: realm,
-			User:  testUser,
-		})
-
-		req, err := http.NewRequestWithContext(ctx, http.MethodPost, fmt.Sprintf("/%d/reset-password", testUser.ID), strings.NewReader(""))
+		form := url.Values{}
+		form.Set("idToken", "foo")
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, "", strings.NewReader(form.Encode()))
 		if err != nil {
 			t.Fatal(err)
 		}
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 
 		w := httptest.NewRecorder()
-		router.ServeHTTP(w, req)
+		handler.ServeHTTP(w, req)
 		result := w.Result()
 		defer result.Body.Close()
 
 		if result.StatusCode != http.StatusUnauthorized {
 			t.Errorf("expected status 401 Unauthorized, got %d", result.StatusCode)
-		}
-	}()
-
-	// success
-	func() {
-		ctx = controller.WithMembership(ctx, &database.Membership{
-			Realm:       realm,
-			User:        testUser,
-			Permissions: rbac.UserWrite,
-		})
-
-		req, err := http.NewRequestWithContext(ctx, http.MethodPost, fmt.Sprintf("/%d/reset-password", testUser.ID), strings.NewReader(""))
-		if err != nil {
-			t.Fatal(err)
-		}
-		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
-
-		w := httptest.NewRecorder()
-		router.ServeHTTP(w, req)
-		result := w.Result()
-		defer result.Body.Close()
-
-		if result.StatusCode != http.StatusSeeOther {
-			t.Errorf("expected status 303 SeeOther, got %d", result.StatusCode)
 		}
 	}()
 }
